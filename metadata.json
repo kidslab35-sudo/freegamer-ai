@@ -1,0 +1,6 @@
+{
+  "name": "AI Keyboard",
+  "description": "An advanced system-wide AI Translate Keyboard and interactive simulator powered by Gemini, ChatGPT, Claude, and Qwen, enabling real-time multi-platform text translation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
