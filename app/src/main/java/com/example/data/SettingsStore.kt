@@ -19,7 +19,7 @@ class SettingsStore(context: Context) {
 
         val PROVIDERS = listOf("Gemini", "ChatGPT", "Claude", "Qwen")
         val LANGUAGES = listOf(
-            "Spanish", "Japanese", "French", "German", "Korean", 
+            "English", "Spanish", "Japanese", "French", "German", "Korean", 
             "Chinese", "Arabic", "Portuguese", "Italian", "Russian", 
             "Vietnamese", "Thai", "Turkish", "Hindi"
         )
@@ -50,7 +50,7 @@ class SettingsStore(context: Context) {
         set(value) = prefs.edit().putString(KEY_QWEN_KEY, value).apply()
 
     var targetLanguage: String
-        get() = prefs.getString(KEY_TARGET_LANG, "Spanish") ?: "Spanish"
+        get() = prefs.getString(KEY_TARGET_LANG, "English") ?: "English"
         set(value) = prefs.edit().putString(KEY_TARGET_LANG, value).apply()
 
     var writingStyle: String

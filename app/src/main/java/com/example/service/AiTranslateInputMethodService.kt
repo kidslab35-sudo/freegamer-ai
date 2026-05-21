@@ -38,7 +38,6 @@ class AiTranslateInputMethodService : InputMethodService() {
     private val typedTextState = mutableStateOf("")
     private val statusTextState = mutableStateOf("")
     private val isLoadingState = mutableStateOf(false)
-    private var composeView: ComposeView? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -50,10 +49,6 @@ class AiTranslateInputMethodService : InputMethodService() {
         // Transition custom lifecycle owner to RESUMED so Compose begins measuring and rendering instantly
         keyboardLifecycleOwner.onStart()
         keyboardLifecycleOwner.onResume()
-
-        composeView?.let { existingView ->
-            return existingView
-        }
 
         val view = ComposeView(this).apply {
             // Use DisposeOnViewTreeLifecycleDestroyed so that the composition survives across multiple hide/show attachments
@@ -73,21 +68,37 @@ class AiTranslateInputMethodService : InputMethodService() {
                         settingsStore = settingsStore,
                         onKeyTyped = { char ->
                             typedTextState.value = typedTextState.value + char
-                            currentInputConnection?.commitText(char, 1)
+                            try {
+                                currentInputConnection?.commitText(char, 1)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                         },
                         onBackspace = {
                             if (typedTextState.value.isNotEmpty()) {
                                 typedTextState.value = typedTextState.value.dropLast(1)
                             }
-                            currentInputConnection?.deleteSurroundingText(1, 0)
+                            try {
+                                currentInputConnection?.deleteSurroundingText(1, 0)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                         },
                         onSpace = {
                             typedTextState.value = typedTextState.value + " "
-                            currentInputConnection?.commitText(" ", 1)
+                            try {
+                                currentInputConnection?.commitText(" ", 1)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                         },
                         onEnter = {
                             typedTextState.value = typedTextState.value + "\n"
-                            currentInputConnection?.commitText("\n", 1)
+                            try {
+                                currentInputConnection?.commitText("\n", 1)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                         },
                         onClear = {
                             typedTextState.value = ""
@@ -102,7 +113,6 @@ class AiTranslateInputMethodService : InputMethodService() {
             }
         }
 
-        composeView = view
         return view
     }
 
@@ -126,12 +136,11 @@ class AiTranslateInputMethodService : InputMethodService() {
     override fun onDestroy() {
         super.onDestroy()
         keyboardLifecycleOwner.onDestroy()
-        composeView = null
         serviceJob.cancel()
     }
 
     private fun performAiTranslation(localText: String) {
-        val connection = currentInputConnection ?: return
+        val initialConnection = currentInputConnection ?: return
         
         // Grab the text to translate. If local texttyped buffer is empty,
         // let's try to grab whatever is currently in the active InputConnection!
@@ -139,7 +148,7 @@ class AiTranslateInputMethodService : InputMethodService() {
         var charactersFetchedFromField = false
         
         if (textToTranslate.trim().isEmpty()) {
-            val fetched = connection.getTextBeforeCursor(200, 0)
+            val fetched = initialConnection.getTextBeforeCursor(200, 0)
             if (!fetched.isNullOrEmpty()) {
                 textToTranslate = fetched.toString()
                 charactersFetchedFromField = true
@@ -158,29 +167,39 @@ class AiTranslateInputMethodService : InputMethodService() {
             val result = AiTranslator.translate(textToTranslate, settingsStore)
             isLoadingState.value = false
 
+            val activeConnection = currentInputConnection
+            if (activeConnection == null) {
+                statusTextState.value = "Failed: Input connection closed."
+                return@launch
+            }
+
             when (result) {
                 is TranslationResult.Success -> {
                     val translatedText = result.text
                     statusTextState.value = "Translated successfully!"
                     
                     // Replace previous text in input editor
-                    connection.beginBatchEdit()
                     try {
+                        activeConnection.beginBatchEdit()
                         if (charactersFetchedFromField) {
                             // If we read from the active cursor, delete what was before
-                            connection.deleteSurroundingText(textToTranslate.length, 0)
+                            activeConnection.deleteSurroundingText(textToTranslate.length, 0)
                         } else {
                             // If we typed directly on keypads, delete typed buffer length
-                            connection.deleteSurroundingText(typedTextState.value.length, 0)
+                            activeConnection.deleteSurroundingText(typedTextState.value.length, 0)
                         }
                         
                         // Insert translated response matching targeted language
-                        connection.commitText(translatedText, 1)
+                        activeConnection.commitText(translatedText, 1)
                         typedTextState.value = ""
                     } catch (e: Exception) {
                         statusTextState.value = "Error inserting text: ${e.message}"
                     } finally {
-                        connection.endBatchEdit()
+                        try {
+                            activeConnection.endBatchEdit()
+                        } catch (ex: Exception) {
+                            ex.printStackTrace()
+                        }
                     }
                 }
                 is TranslationResult.Failure -> {
